@@ -1,6 +1,11 @@
 package craicoverflow89.javascriptminifier
 
 import java.io.File
+import java.io.InputStreamReader
+import java.io.OutputStreamWriter
+import java.net.HttpURLConnection
+import java.net.URL
+import java.net.URLEncoder
 import kotlin.system.exitProcess
 
 fun main(args: Array<String>) {
@@ -46,7 +51,7 @@ fun main(args: Array<String>) {
     } else if(inputFile.isDirectory) inputFile.absolutePath else inputFile.parentFile.absolutePath
 
     // Parse Flags
-    val flags: String = if(args.size > 2 || args[1].startsWith("-")) args.let {
+    val flags: String = if(args.size > 2 || (args.size > 1 && args[1].startsWith("-"))) args.let {
         if(args[1].startsWith("-")) args[1]
         else args[2]
     }.let {
@@ -62,17 +67,53 @@ fun main(args: Array<String>) {
         it.substring(1)
 
     } else ""
+    // NOTE: should just treat final element in args as flags
+    //       if(args.size > 1 && last element startsWith("-"))
 
-    // Minify Logic
+    // Network Logic
+    fun minifyRequest(input: File): String {
+
+        // Create Content
+        val content = StringBuilder().apply {
+            //append(URLEncoder.encode("input", Charsets.UTF_8))
+            append(URLEncoder.encode("input", "UTF-8"))
+            append("=")
+            append(URLEncoder.encode(input.readText(), "UTF-8"))
+        }.toString()
+
+        // Create Request
+        val request = (URL("https://javascript-minifier.com/raw").openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            doOutput = true
+            setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+            setRequestProperty("charset", "utf-8")
+            setRequestProperty("Content-Length", content.length.toString())
+            OutputStreamWriter(outputStream).apply {
+                write(content)
+                flush()
+            }
+        }
+
+        // Parse Response
+        if(request.responseCode == 200) {
+
+            // Return Result
+            return InputStreamReader(request.inputStream).readText()
+        }
+
+        // Handle Error
+        println("Error minifying ${input.name}!\n${request.responseCode} ${request.responseMessage}!")
+        exitProcess(-1)
+    }
+
+    // File Logic
     fun minifyFile(input: File, output: String) {
 
-        // Read File
-        val content = input.readText()
-
-        // NOTE: this is where a POST request is required
+        // Minify Content
+        val response = minifyRequest(input)
 
         // Write File
-        File("$output/${input.nameWithoutExtension}.min.js").writeText(content)
+        File("$output/${input.nameWithoutExtension}.min.js").writeText(response)
     }
 
     // Process Logic
