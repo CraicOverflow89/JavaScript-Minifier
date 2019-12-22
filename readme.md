@@ -31,6 +31,9 @@ $ jsmin src out
 
 $ jsmin src out -r
 # Same as before including subdirectories
+
+$ jsmin src out -s
+# Minifies all into a single file in the out directory
 ```
 
 ### See Also

@@ -13,15 +13,20 @@ fun main(args: Array<String>) {
     // Missing Arguments
     if(args.isEmpty()) {
         println("Invalid arguments!")
-        println(" jsmin [input] [output] [-r]")
+        println(" jsmin [input] [output] [-rs]")
         exitProcess(-1)
     }
 
     // File Paths
     val cwd = System.getProperty("user.dir")
 
+    // Parse Arguments
+    val arguments = args.partition {
+        !it.startsWith("-")
+    }
+
     // Input File
-    val inputFile = File("$cwd/${args[0]}")
+    val inputFile = File("$cwd/${arguments.first[0]}")
 
     // Invalid Path
     if(!inputFile.exists()) {
@@ -30,8 +35,8 @@ fun main(args: Array<String>) {
     }
 
     // Output Directory
-    val outputPath = if(args.size > 1 && !args[1].startsWith("-")) {
-        "%s/%s".format(cwd, args[1].apply {
+    val outputPath = when {
+        arguments.first.size > 1 -> "%s/%s".format(cwd, arguments.first[1].apply {
             File(this).apply {
 
                 // Existing Directory
@@ -48,37 +53,26 @@ fun main(args: Array<String>) {
                 else mkdir()
             }
         })
-    } else if(inputFile.isDirectory) inputFile.absolutePath else inputFile.parentFile.absolutePath
+        inputFile.isDirectory -> inputFile.absolutePath
+        else -> inputFile.parentFile.absolutePath
+    }
 
     // Parse Flags
-    val flags: String = if(args.size > 2 || (args.size > 1 && args[1].startsWith("-"))) args.let {
-        if(args[1].startsWith("-")) args[1]
-        else args[2]
-    }.let {
-
-        // Invalid Argument
-        if(!it.startsWith("-") || it.length < 2) {
-            println("Invalid arguments!")
-            println(" jsmin [input] [output] [-r]")
-            exitProcess(-1)
-        }
-
-        // Parse Chars
-        it.substring(1)
-
-    } else ""
-    // NOTE: should just treat final element in args as flags
-    //       if(args.size > 1 && last element startsWith("-"))
+    val flags = arguments.second.filter {
+        it.length == 2
+    }.joinToString {
+        it.substring(1).toLowerCase()
+    }
 
     // Network Logic
-    fun minifyRequest(input: File): String {
+    fun minifyRequest(input: String): String {
 
         // Create Content
         val content = StringBuilder().apply {
             //append(URLEncoder.encode("input", Charsets.UTF_8))
             append(URLEncoder.encode("input", "UTF-8"))
             append("=")
-            append(URLEncoder.encode(input.readText(), "UTF-8"))
+            append(URLEncoder.encode(input, "UTF-8"))
         }.toString()
 
         // Create Request
@@ -102,7 +96,7 @@ fun main(args: Array<String>) {
         }
 
         // Handle Error
-        println("Error minifying ${input.name}!\n${request.responseCode} ${request.responseMessage}!")
+        println("Error minifying code!\n${request.responseCode} ${request.responseMessage}!")
         exitProcess(-1)
     }
 
@@ -110,13 +104,14 @@ fun main(args: Array<String>) {
     fun minifyFile(input: File, output: String) {
 
         // Minify Content
-        val response = minifyRequest(input)
+        val response = minifyRequest(input.readText())
 
         // Write File
         File("$output/${input.nameWithoutExtension}.min.js").writeText(response)
     }
 
     // Process Logic
+    val buffer = if(flags.contains("s")) StringBuffer() else null
     fun minifyProcess(input: File, output: String) {
 
         // Process Directory
@@ -126,7 +121,8 @@ fun main(args: Array<String>) {
             filter {
                 it.extension == "js"
             }.forEach {
-                minifyFile(it, output)
+                if(flags.contains("s")) buffer!!.append(minifyRequest(input.readText()))
+                else minifyFile(it, output)
             }
 
             // Process Subdirectories
@@ -149,9 +145,17 @@ fun main(args: Array<String>) {
         }
 
         // Process File
-        else minifyFile(input, output)
+        else {
+            if(flags.contains("s")) buffer!!.append(minifyRequest(input.readText()))
+            else minifyFile(input, output)
+        }
     }
 
     // Invoke Process
     minifyProcess(inputFile, outputPath)
+
+    // Write Single
+    if(flags.contains("s")) {
+        File("$outputPath/single.min.js").writeText(buffer.toString())
+    }
 }
