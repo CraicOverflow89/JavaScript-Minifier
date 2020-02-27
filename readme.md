@@ -12,7 +12,7 @@ Add a `jsmin` script to your PATH, replacing _x.y.z_ with version.
 java -jar /path/to/jsmin-x.y.z.jar "$@"
 
 # windows batch file
-@java -jar /path/to/jsmin-x.y.z.jar %*
+@call java -jar /path/to/jsmin-x.y.z.jar %*
 ```
 
 ### Usage
